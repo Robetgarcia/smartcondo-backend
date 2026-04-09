@@ -1,4 +1,4 @@
-# NUNCA commitar isso — vai para o Render como variável de ambiente
+
 .env
 .env.local
 
