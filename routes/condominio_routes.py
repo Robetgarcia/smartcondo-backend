@@ -98,24 +98,6 @@ def ocultar_condominio(cond_id):
         return jsonify({"success": False, "error": error}), 400
     return jsonify({"success": True, "message": "Condomínio ocultado"}), 200
 
-
-
-@condominio_bp.route('/condominios/<int:cond_id>/moradores', methods=['GET'])
-def listar_moradores(cond_id):
-    """
-    Lista moradores (usuarios com Planos) de um condominio especifico.
-    Query: ?user_id=X  (para verificar ownership)
-    """
-    user_id = request.args.get('user_id', type=int)
-    if not user_id:
-        return jsonify({'success': False, 'error': "Parametro 'user_id' e obrigatorio"}), 400
-    if not CondominioService.get_user_condominios(user_id):
-        # verifica se o usuario tem acesso
-        pass
-    moradores = UserRepository.get_by_condominio(cond_id)
-    return jsonify({'success': True, 'data': moradores, 'total': len(moradores)}), 200
-
-
 @condominio_bp.route('/condominios/<int:cond_id>/statistics', methods=['GET'])
 def estatisticas_condominio(cond_id):
     """
