@@ -156,7 +156,6 @@ def deletar_condominio(cond_id):
 
 
 # ── Moradores ─────────────────────────────────────────────────────────────────
-from repositories.moradores_repository import MoradoresRepository
 from core.exceptions import DuplicateError
 
 @condominio_bp.route('/condominios/<int:cond_id>/moradores', methods=['GET'])
