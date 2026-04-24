@@ -15,6 +15,7 @@ from flask_cors import CORS
 from routes.auth_routes import auth_bp
 from routes.condominio_routes import condominio_bp
 from routes.manutencao_routes import manutencao_bp
+from routes.residencia_routes import residencia_bp
 
 
 def create_app() -> Flask:
@@ -24,6 +25,7 @@ def create_app() -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(condominio_bp)
     app.register_blueprint(manutencao_bp)
+    app.register_blueprint(residencia_bp)    # /residencias/*
 
     @app.route('/health', methods=['GET'])
     def health():
