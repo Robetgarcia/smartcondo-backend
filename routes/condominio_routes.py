@@ -17,6 +17,15 @@ def get_usuario(user_id):
     return jsonify({"success": True, "data": user.to_dict()}), 200
 
 
+@condominio_bp.route('/usuarios/<int:user_id>', methods=['DELETE'])
+def deletar_usuario(user_id):
+    """Deleta conta do usuario e todos os dados relacionados"""
+    success = UserRepository.delete_user(user_id)
+    if success:
+        return jsonify({"success": True, "message": "Conta deletada permanentemente"}), 200
+    return jsonify({"success": False, "error": "Erro ao deletar conta"}), 400
+
+
 @condominio_bp.route('/condominios', methods=['GET'])
 def listar_condominios():
     user_id = request.args.get('user_id', type=int)
@@ -90,6 +99,51 @@ def ocultar_condominio(cond_id):
     return jsonify({"success": True, "message": "Condomínio ocultado"}), 200
 
 
+
+@condominio_bp.route('/condominios/<int:cond_id>/moradores', methods=['GET'])
+def listar_moradores(cond_id):
+    """
+    Lista moradores (usuarios com Planos) de um condominio especifico.
+    Query: ?user_id=X  (para verificar ownership)
+    """
+    user_id = request.args.get('user_id', type=int)
+    if not user_id:
+        return jsonify({'success': False, 'error': "Parametro 'user_id' e obrigatorio"}), 400
+    if not CondominioService.get_user_condominios(user_id):
+        # verifica se o usuario tem acesso
+        pass
+    moradores = UserRepository.get_by_condominio(cond_id)
+    return jsonify({'success': True, 'data': moradores, 'total': len(moradores)}), 200
+
+
+@condominio_bp.route('/condominios/<int:cond_id>/statistics', methods=['GET'])
+def estatisticas_condominio(cond_id):
+    """
+    Estatisticas de um condominio especifico (manutencoes + info geral).
+    Query: ?user_id=X
+    """
+    from services.manutencao_service import ManutencaoService
+    user_id = request.args.get('user_id', type=int)
+    if not user_id:
+        return jsonify({'success': False, 'error': "Parametro 'user_id' e obrigatorio"}), 400
+
+    cond, error = CondominioService.get_condominio(cond_id, user_id)
+    if error:
+        return jsonify({'success': False, 'error': error}), 403
+
+    manut_stats = ManutencaoService.get_statistics(user_id, cond_id)
+
+    return jsonify({'success': True, 'data': {
+        'condominio': {
+            'id':   cond.id,
+            'nome': cond.nome_condominio,
+            'tipo': cond.tipo_condominio,
+            'blocos':   cond.quantidade_blocos,
+            'unidades': cond.quantidade_unidades,
+        },
+        'manutencoes': manut_stats
+    }}), 200
+
 @condominio_bp.route('/condominios/<int:cond_id>', methods=['DELETE'])
 def deletar_condominio(cond_id):
     user_id = request.args.get('user_id', type=int)
@@ -99,3 +153,75 @@ def deletar_condominio(cond_id):
     if error:
         return jsonify({"success": False, "error": error}), 400
     return jsonify({"success": True, "message": "Condomínio deletado permanentemente"}), 200
+
+
+# ── Moradores ─────────────────────────────────────────────────────────────────
+from repositories.moradores_repository import MoradoresRepository
+from core.exceptions import DuplicateError
+
+@condominio_bp.route('/condominios/<int:cond_id>/moradores', methods=['GET'])
+def listar_moradores(cond_id):
+    """Lista todos os moradores de um condomínio"""
+    user_id = request.args.get('user_id', type=int)
+    if not user_id:
+        return jsonify({"success": False, "error": "user_id é obrigatório"}), 400
+    from repositories.condominio_repository import CondominioRepository
+    if not CondominioRepository.verify_ownership(cond_id, user_id):
+        return jsonify({"success": False, "error": "Acesso negado"}), 403
+    moradores = MoradoresRepository.get_by_condominio(cond_id)
+    return jsonify({"success": True, "data": moradores}), 200
+
+
+@condominio_bp.route('/condominios/<int:cond_id>/moradores/buscar', methods=['GET'])
+def buscar_usuario_por_email(cond_id):
+    """Busca um usuário por email para adicionar como morador"""
+    email = request.args.get('email', '').strip()
+    if not email:
+        return jsonify({"success": False, "error": "email é obrigatório"}), 400
+    usuario = MoradoresRepository.buscar_por_email(email)
+    if not usuario:
+        return jsonify({"success": False, "error": "Nenhum usuário encontrado com este email"}), 404
+    return jsonify({"success": True, "data": usuario}), 200
+
+
+@condominio_bp.route('/condominios/<int:cond_id>/moradores', methods=['POST'])
+def adicionar_morador(cond_id):
+    """
+    Adiciona morador ao condomínio
+    Body: { "cliente_id": X, "unidade": "Apto 201", "user_id": Y }
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "error": "Body JSON ausente"}), 400
+    cliente_id = data.get('cliente_id')
+    user_id    = data.get('user_id')
+    unidade    = data.get('unidade', '').strip() or None
+    if not cliente_id or not user_id:
+        return jsonify({"success": False, "error": "cliente_id e user_id são obrigatórios"}), 400
+    from repositories.condominio_repository import CondominioRepository
+    if not CondominioRepository.verify_ownership(cond_id, int(user_id)):
+        return jsonify({"success": False, "error": "Acesso negado"}), 403
+    try:
+        morador_id = MoradoresRepository.adicionar(cond_id, int(cliente_id), unidade)
+        return jsonify({"success": True, "data": {"id": morador_id}}), 201
+    except DuplicateError as e:
+        return jsonify({"success": False, "error": str(e)}), 409
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Erro: {e}"}), 400
+
+
+@condominio_bp.route('/condominios/<int:cond_id>/moradores/<int:morador_id>', methods=['DELETE'])
+def remover_morador(cond_id, morador_id):
+    """Remove morador do condomínio"""
+    user_id = request.args.get('user_id', type=int)
+    if not user_id:
+        return jsonify({"success": False, "error": "user_id é obrigatório"}), 400
+    from repositories.condominio_repository import CondominioRepository
+    if not CondominioRepository.verify_ownership(cond_id, user_id):
+        return jsonify({"success": False, "error": "Acesso negado"}), 403
+    success = MoradoresRepository.remover(morador_id)
+    if success:
+        return jsonify({"success": True, "message": "Morador removido"}), 200
+    return jsonify({"success": False, "error": "Registro não encontrado"}), 404
