@@ -66,6 +66,40 @@ class UserRepository(BaseRepository):
         )
         return rows > 0
 
+
+    @classmethod
+    def get_by_condominio(cls, cond_id: int) -> list:
+        """
+        Retorna todos os usuarios (moradores) vinculados a um condominio
+        via tabela Planos. Inclui nome, email, telefone, tipo e plano.
+        """
+        query = """
+            SELECT DISTINCT
+                c.id, c.nome_completo, c.email, c.cpf,
+                c.telefone, c.tipo_cliente, c.data_nascimento,
+                p.tipo_plano, p.valor, p.data_inicio
+            FROM Cliente c
+            INNER JOIN Planos p ON p.cliente_id = c.id
+            WHERE p.condominio_id = %s
+            ORDER BY c.nome_completo
+        """
+        results = cls.execute_query(query, (cond_id,), fetch_all=True)
+        moradores = []
+        for row in results:
+            moradores.append({
+                'id':            row[0],
+                'nome_completo': row[1],
+                'email':         row[2],
+                'cpf':           row[3],
+                'telefone':      row[4],
+                'tipo_cliente':  row[5],
+                'data_nascimento': row[6].isoformat() if row[6] else None,
+                'tipo_plano':    row[7],
+                'valor_plano':   float(row[8]) if row[8] else None,
+                'data_inicio':   row[9].isoformat() if row[9] else None,
+            })
+        return moradores
+
     @classmethod
     def delete_user(cls, user_id: int) -> bool:
         queries = [
