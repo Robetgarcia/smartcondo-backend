@@ -1,5 +1,6 @@
 """
 Rotas de Condomínio e Usuário
+CORRIGIDO - Rotas de moradores movidas para residencia_routes.py
 """
 from flask import Blueprint, request, jsonify
 from services.condominio_service import CondominioService
@@ -98,6 +99,7 @@ def ocultar_condominio(cond_id):
         return jsonify({"success": False, "error": error}), 400
     return jsonify({"success": True, "message": "Condomínio ocultado"}), 200
 
+
 @condominio_bp.route('/condominios/<int:cond_id>/statistics', methods=['GET'])
 def estatisticas_condominio(cond_id):
     """
@@ -126,6 +128,7 @@ def estatisticas_condominio(cond_id):
         'manutencoes': manut_stats
     }}), 200
 
+
 @condominio_bp.route('/condominios/<int:cond_id>', methods=['DELETE'])
 def deletar_condominio(cond_id):
     user_id = request.args.get('user_id', type=int)
@@ -137,94 +140,7 @@ def deletar_condominio(cond_id):
     return jsonify({"success": True, "message": "Condomínio deletado permanentemente"}), 200
 
 
-# ── Moradores ─────────────────────────────────────────────────────────────────
-from core.exceptions import DuplicateError
-
-@condominio_bp.route('/condominios/<int:cond_id>/moradores', methods=['GET'])
-def listar_moradores(cond_id):
-    """Lista todos os moradores de um condomínio - DEBUG ATUALIZADO"""
-    user_id = request.args.get('user_id', type=int)
-    
-    print(f"[DEBUG LISTAGEM] === INÍCIO ===")
-    print(f"[DEBUG LISTAGEM] cond_id = {cond_id} | user_id = {user_id}")
-
-    if not user_id:
-        print("[DEBUG LISTAGEM] ERRO: user_id ausente")
-        return jsonify({"success": False, "error": "user_id é obrigatório"}), 400
-
-    # Verifica ownership
-    ownership = CondominioRepository.verify_ownership(cond_id, user_id)
-    print(f"[DEBUG LISTAGEM] verify_ownership = {ownership}")
-
-    if not ownership:
-        print("[DEBUG LISTAGEM] ERRO: Acesso negado")
-        return jsonify({"success": False, "error": "Acesso negado"}), 403
-
-    # Chama o repository
-    moradores = CondominioRepository.get_moradores_by_condominio(cond_id)
-    
-    print(f"[DEBUG LISTAGEM] Quantidade de moradores retornados: {len(moradores)}")
-    
-    if moradores:
-        print(f"[DEBUG LISTAGEM] Primeiro morador exemplo: {moradores[0]}")
-    else:
-        print("[DEBUG LISTAGEM] Nenhum morador retornado - query retornou lista vazia")
-
-    print(f"[DEBUG LISTAGEM] === FIM ===\n")
-
-    return jsonify({"success": True, "data": moradores}), 200
-
-
-@condominio_bp.route('/condominios/<int:cond_id>/moradores/buscar', methods=['GET'])
-def buscar_usuario_por_email(cond_id):
-    """Busca um usuário por email para adicionar como morador"""
-    email = request.args.get('email', '').strip()
-    if not email:
-        return jsonify({"success": False, "error": "email é obrigatório"}), 400
-    usuario = MoradoresRepository.buscar_por_email(email)
-    if not usuario:
-        return jsonify({"success": False, "error": "Nenhum usuário encontrado com este email"}), 404
-    return jsonify({"success": True, "data": usuario}), 200
-
-
-@condominio_bp.route('/condominios/<int:cond_id>/moradores', methods=['POST'])
-def adicionar_morador(cond_id):
-    """
-    Adiciona morador ao condomínio
-    Body: { "cliente_id": X, "unidade": "Apto 201", "user_id": Y }
-    """
-    data = request.get_json()
-    if not data:
-        return jsonify({"success": False, "error": "Body JSON ausente"}), 400
-    cliente_id = data.get('cliente_id')
-    user_id    = data.get('user_id')
-    unidade    = data.get('unidade', '').strip() or None
-    if not cliente_id or not user_id:
-        return jsonify({"success": False, "error": "cliente_id e user_id são obrigatórios"}), 400
-    from repositories.condominio_repository import CondominioRepository
-    if not CondominioRepository.verify_ownership(cond_id, int(user_id)):
-        return jsonify({"success": False, "error": "Acesso negado"}), 403
-    try:
-        morador_id = MoradoresRepository.adicionar(cond_id, int(cliente_id), unidade)
-        return jsonify({"success": True, "data": {"id": morador_id}}), 201
-    except DuplicateError as e:
-        return jsonify({"success": False, "error": str(e)}), 409
-    except ValueError as e:
-        return jsonify({"success": False, "error": str(e)}), 404
-    except Exception as e:
-        return jsonify({"success": False, "error": f"Erro: {e}"}), 400
-
-
-@condominio_bp.route('/condominios/<int:cond_id>/moradores/<int:morador_id>', methods=['DELETE'])
-def remover_morador(cond_id, morador_id):
-    """Remove morador do condomínio"""
-    user_id = request.args.get('user_id', type=int)
-    if not user_id:
-        return jsonify({"success": False, "error": "user_id é obrigatório"}), 400
-    from repositories.condominio_repository import CondominioRepository
-    if not CondominioRepository.verify_ownership(cond_id, user_id):
-        return jsonify({"success": False, "error": "Acesso negado"}), 403
-    success = MoradoresRepository.remover(morador_id)
-    if success:
-        return jsonify({"success": True, "message": "Morador removido"}), 200
-    return jsonify({"success": False, "error": "Registro não encontrado"}), 404
+# ═══════════════════════════════════════════════════════════════════════════
+# ROTAS DE MORADORES REMOVIDAS
+# Use /residencias/* para gerenciar moradores (ver residencia_routes.py)
+# ═══════════════════════════════════════════════════════════════════════════
