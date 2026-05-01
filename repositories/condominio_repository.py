@@ -1,7 +1,8 @@
 """
 Repository para operações de Condomínio + Moradores
-Versão corrigida e completa
+Versão corrigida e limpa para deploy
 """
+
 from typing import Optional, List
 from repositories.base_repository import BaseRepository
 from models.condominio import Condominio
@@ -16,16 +17,16 @@ class CondominioRepository(BaseRepository):
     @classmethod
     def _row_to_obj(cls, row) -> Condominio:
         return Condominio(
-            id=row[0], 
-            nome_condominio=row[1], 
-            endereco=row[2], 
+            id=row[0],
+            nome_condominio=row[1],
+            endereco=row[2],
             cnpj=row[3],
-            tipo_condominio=row[4], 
-            quantidade_blocos=row[5], 
+            tipo_condominio=row[4],
+            quantidade_blocos=row[5],
             quantidade_unidades=row[6],
-            data_fundacao=row[7], 
-            area_total=row[8], 
-            responsavel_manutencao=row[9], 
+            data_fundacao=row[7],
+            area_total=row[8],
+            responsavel_manutencao=row[9],
             oculto=row[10]
         )
 
@@ -54,21 +55,17 @@ class CondominioRepository(BaseRepository):
         results = cls.execute_query(query, (user_id,), fetch_all=True)
         return [cls._row_to_obj(r) for r in results]
 
-       @classmethod
+    @classmethod
     def verify_ownership(cls, cond_id: int, user_id: int) -> bool:
-        """
-        Verifica se o usuário tem permissão no condomínio.
-        - Responsável principal (responsavel_manutencao)
-        - Ou síndico/administrador vinculado via Residencias
-        """
+        """Verifica se o usuário tem permissão no condomínio"""
         query = """
             SELECT EXISTS (
                 SELECT 1 
                 FROM Condominios c
                 WHERE c.id = %s 
                   AND (
-                      c.responsavel_manutencao = %s                     -- é o dono
-                      OR EXISTS (                                        -- ou é síndico/morador vinculado
+                      c.responsavel_manutencao = %s
+                      OR EXISTS (
                           SELECT 1 FROM Residencias r 
                           WHERE r.condominio_id = c.id 
                             AND r.cliente_id = %s 
@@ -97,10 +94,9 @@ class CondominioRepository(BaseRepository):
         result = cls.execute_query(query, (nome, cnpj, user_id), fetch_one=True)
         return result[0] if result else None
 
-    # ====================== MORADORES ======================
-
-        @classmethod
+    @classmethod
     def get_moradores_by_condominio(cls, cond_id: int) -> List[dict]:
+        """Retorna todos os moradores de um condomínio"""
         query = """
             SELECT 
                 r.id AS residencia_id,
@@ -136,11 +132,9 @@ class CondominioRepository(BaseRepository):
             'ativo':           row[10]
         } for row in results]
 
-    # ====================== OUTROS MÉTODOS ======================
-
     @classmethod
     def create(cls, nome, endereco, cnpj, tipo, blocos, unidades, 
-               data_fundacao, user_id) -> int:
+               data_fundacao, user_id) -> Optional[int]:
         if cls.cnpj_exists(cnpj):
             raise DuplicateError("CNPJ já cadastrado")
 
@@ -170,7 +164,7 @@ class CondominioRepository(BaseRepository):
         queries = [
             ("DELETE FROM Registro_Manutencao WHERE condominio_id = %s", (cond_id,)),
             ("DELETE FROM Planos WHERE condominio_id = %s", (cond_id,)),
-            ("DELETE FROM Residencias WHERE condominio_id = %s", (cond_id,)),   # importante!
+            ("DELETE FROM Residencias WHERE condominio_id = %s", (cond_id,)),
             ("DELETE FROM Condominios WHERE id = %s", (cond_id,))
         ]
         try:
@@ -180,22 +174,3 @@ class CondominioRepository(BaseRepository):
         except Exception as e:
             print(f"Erro ao deletar condomínio: {e}")
             return False
-
-    @classmethod
-    def get_statistics(cls, user_id: int) -> dict:
-        query = """
-            SELECT COUNT(*),
-                   SUM(quantidade_blocos), 
-                   SUM(quantidade_unidades)
-            FROM Condominios
-            WHERE responsavel_manutencao = %s 
-              AND COALESCE(oculto, FALSE) = FALSE
-        """
-        result = cls.execute_query(query, (user_id,), fetch_one=True)
-        if result:
-            return {
-                'total': result[0] or 0,
-                'total_blocos': result[1] or 0,
-                'total_unidades': result[2] or 0,
-            }
-        return {'total': 0, 'total_blocos': 0, 'total_unidades': 0}
