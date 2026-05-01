@@ -54,16 +54,31 @@ class CondominioRepository(BaseRepository):
         results = cls.execute_query(query, (user_id,), fetch_all=True)
         return [cls._row_to_obj(r) for r in results]
 
-    @classmethod
+       @classmethod
     def verify_ownership(cls, cond_id: int, user_id: int) -> bool:
+        """
+        Verifica se o usuário tem permissão no condomínio.
+        - Responsável principal (responsavel_manutencao)
+        - Ou síndico/administrador vinculado via Residencias
+        """
         query = """
-            SELECT EXISTS(
-                SELECT 1 FROM Condominios 
-                WHERE id = %s AND responsavel_manutencao = %s
+            SELECT EXISTS (
+                SELECT 1 
+                FROM Condominios c
+                WHERE c.id = %s 
+                  AND (
+                      c.responsavel_manutencao = %s                     -- é o dono
+                      OR EXISTS (                                        -- ou é síndico/morador vinculado
+                          SELECT 1 FROM Residencias r 
+                          WHERE r.condominio_id = c.id 
+                            AND r.cliente_id = %s 
+                            AND r.ativo = TRUE
+                      )
+                  )
             )
         """
-        result = cls.execute_query(query, (cond_id, user_id), fetch_one=True)
-        return result[0] if result else False
+        result = cls.execute_query(query, (cond_id, user_id, user_id), fetch_one=True)
+        return bool(result[0]) if result else False
 
     @classmethod
     def cnpj_exists(cls, cnpj: str) -> bool:
@@ -84,12 +99,8 @@ class CondominioRepository(BaseRepository):
 
     # ====================== MORADORES ======================
 
-    @classmethod
+        @classmethod
     def get_moradores_by_condominio(cls, cond_id: int) -> List[dict]:
-        """
-        Retorna todos os moradores ativos de um condomínio
-        com dados completos do cliente + residência.
-        """
         query = """
             SELECT 
                 r.id AS residencia_id,
@@ -111,22 +122,19 @@ class CondominioRepository(BaseRepository):
         """
         results = cls.execute_query(query, (cond_id,), fetch_all=True)
         
-        moradores = []
-        for row in results:
-            moradores.append({
-                'residencia_id':   row[0],
-                'id':              row[1],           # cliente_id
-                'nome_completo':   row[2],
-                'email':           row[3],
-                'telefone':        row[4],
-                'tipo_cliente':    row[5],
-                'cpf':             row[6],
-                'bloco':           row[7],
-                'numero_unidade':  row[8],
-                'data_entrada':    row[9].isoformat() if row[9] else None,
-                'ativo':           row[10]
-            })
-        return moradores
+        return [{
+            'residencia_id':   row[0],
+            'id':              row[1],
+            'nome_completo':   row[2],
+            'email':           row[3],
+            'telefone':        row[4],
+            'tipo_cliente':    row[5],
+            'cpf':             row[6],
+            'bloco':           row[7],
+            'numero_unidade':  row[8],
+            'data_entrada':    row[9].isoformat() if row[9] else None,
+            'ativo':           row[10]
+        } for row in results]
 
     # ====================== OUTROS MÉTODOS ======================
 
