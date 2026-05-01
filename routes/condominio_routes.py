@@ -142,15 +142,36 @@ from core.exceptions import DuplicateError
 
 @condominio_bp.route('/condominios/<int:cond_id>/moradores', methods=['GET'])
 def listar_moradores(cond_id):
-    """Lista todos os moradores de um condomínio"""
+    """Lista todos os moradores de um condomínio - DEBUG ATUALIZADO"""
     user_id = request.args.get('user_id', type=int)
+    
+    print(f"[DEBUG LISTAGEM] === INÍCIO ===")
+    print(f"[DEBUG LISTAGEM] cond_id = {cond_id} | user_id = {user_id}")
+
     if not user_id:
+        print("[DEBUG LISTAGEM] ERRO: user_id ausente")
         return jsonify({"success": False, "error": "user_id é obrigatório"}), 400
 
-    if not CondominioRepository.verify_ownership(cond_id, user_id):
+    # Verifica ownership
+    ownership = CondominioRepository.verify_ownership(cond_id, user_id)
+    print(f"[DEBUG LISTAGEM] verify_ownership = {ownership}")
+
+    if not ownership:
+        print("[DEBUG LISTAGEM] ERRO: Acesso negado")
         return jsonify({"success": False, "error": "Acesso negado"}), 403
 
+    # Chama o repository
     moradores = CondominioRepository.get_moradores_by_condominio(cond_id)
+    
+    print(f"[DEBUG LISTAGEM] Quantidade de moradores retornados: {len(moradores)}")
+    
+    if moradores:
+        print(f"[DEBUG LISTAGEM] Primeiro morador exemplo: {moradores[0]}")
+    else:
+        print("[DEBUG LISTAGEM] Nenhum morador retornado - query retornou lista vazia")
+
+    print(f"[DEBUG LISTAGEM] === FIM ===\n")
+
     return jsonify({"success": True, "data": moradores}), 200
 
 
