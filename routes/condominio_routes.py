@@ -146,10 +146,11 @@ def listar_moradores(cond_id):
     user_id = request.args.get('user_id', type=int)
     if not user_id:
         return jsonify({"success": False, "error": "user_id é obrigatório"}), 400
-    from repositories.condominio_repository import CondominioRepository
+
     if not CondominioRepository.verify_ownership(cond_id, user_id):
         return jsonify({"success": False, "error": "Acesso negado"}), 403
-    moradores = MoradoresRepository.get_by_condominio(cond_id)
+
+    moradores = CondominioRepository.get_moradores_by_condominio(cond_id)
     return jsonify({"success": True, "data": moradores}), 200
 
 
